@@ -56,12 +56,14 @@ const getPRs = async (
   return results.data;
 };
 
-const getAvgTimes = (times, countPrs) => {
+const getAvgResumeData = (data, countPrs) => {
   return {
-    firstReviewAvg: formatTime(times.firstReview / countPrs),
-    getApprovesAvg: formatTime(times.getApproves / countPrs),
-    reviewTimeAvg: formatTime(times.reviewTime / countPrs),
-    timeToMergeAvg: formatTime(times.timeToMerge / countPrs)
+    firstReviewAvg: formatTime(data.firstReview / countPrs),
+    getApprovesAvg: formatTime(data.getApproves / countPrs),
+    reviewTimeAvg: formatTime(data.reviewTime / countPrs),
+    timeToMergeAvg: formatTime(data.timeToMerge / countPrs),
+    filesChangedAvg: Math.floor(data.filesChanged / countPrs),
+    changesAvg: Math.floor(data.changes / countPrs)
   };
 };
 
@@ -111,17 +113,34 @@ async function main() {
     page += 1;
   }
 
-  let times = {
+  let resumeData = {
     firstReview: 0,
     getApproves: 0,
     reviewTime: 0,
-    timeToMerge: 0
+    timeToMerge: 0,
+    filesChanged: 0,
+    changes: 0
   };
   const results = await Promise.all(
     prs.map(async (pr) => {
       const { number, closed_at, created_at } = pr;
       const closed = new Date(closed_at);
       const created = new Date(created_at);
+
+      const files = await octokit.request(
+        'GET /repos/{owner}/{repo}/pulls/{number}/files',
+        {
+          owner: process.env.REPO_OWNER,
+          repo: process.env.REPO_NAME,
+          number,
+          per_page: 100
+        }
+      );
+
+      const changes = files.data.reduce(
+        (sumChanges, fileChange) => fileChange.changes + sumChanges,
+        0
+      );
 
       const reviews = await octokit.request(
         'GET /repos/{owner}/{repo}/pulls/{number}/reviews',
@@ -151,6 +170,19 @@ async function main() {
       );
 
       // Time to first review (in days or hours)
+      if (!reviews.data[0]) {
+        return {
+          number,
+          createdAt: created.toISOString(),
+          closedAt: closed.toISOString(),
+          firstReview: 0,
+          getApproves: 0,
+          reviewTime: 0,
+          timeToMerge: 0,
+          filesChanged: files.data.length,
+          changes
+        };
+      }
       const firstReview = new Date(reviews.data[0].submitted_at);
       const timeToFirstReview = timeDiff(firstReview, created);
 
@@ -166,15 +198,19 @@ async function main() {
       // Time to merge
       const timeToMerge = timeDiff(closed, created);
 
-      times.firstReview += timeToFirstReview;
-      times.getApproves += timeEnoughApproves;
-      times.reviewTime += reviewTime;
-      times.timeToMerge += timeToMerge;
+      resumeData.firstReview += timeToFirstReview;
+      resumeData.getApproves += timeEnoughApproves;
+      resumeData.reviewTime += reviewTime;
+      resumeData.timeToMerge += timeToMerge;
+      resumeData.filesChanged += files.data.length;
+      resumeData.changes += changes;
 
       return {
         number,
         createdAt: created.toISOString(),
         closedAt: closed.toISOString(),
+        filesChanged: files.data.length,
+        changes,
         firstReview: formatTime(timeToFirstReview),
         getApproves: formatTime(timeEnoughApproves),
         reviewTime: formatTime(reviewTime),
@@ -184,7 +220,7 @@ async function main() {
   );
 
   console.table(results);
-  console.table([getAvgTimes(times, results.length)]);
+  console.table([getAvgResumeData(resumeData, results.length)]);
 }
 
 main();
