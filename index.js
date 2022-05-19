@@ -67,6 +67,48 @@ const getAvgResumeData = (data, countPrs) => {
   };
 };
 
+const getAvgResumeDataByAuthor = (results) => {
+  const byAuthorResults = {}
+  results.forEach((result) => {
+    const collection = byAuthorResults[result.author]
+    if (!collection) {
+      byAuthorResults[result.author] = [result];
+    } else {
+      collection.push(result);
+    }
+  });
+  const resume = []
+  Object.keys(byAuthorResults).forEach((author) => {
+    const results = byAuthorResults[author];
+    const numnerOfPRs = results.length;
+    let filesChanged = 0;
+    let changes = 0;
+    let timeToMergeRaw = 0;
+    let timeToFirstReviewRaw = 0;
+    let timeEnoughApprovesRaw = 0;
+    let reviewTimeRaw = 0;
+    results.forEach((result) => {
+      filesChanged += result.filesChanged;
+      changes += result.changes;
+      timeToMergeRaw += result.timeToMergeRaw;
+      timeToFirstReviewRaw += result.timeToFirstReviewRaw;
+      timeEnoughApprovesRaw += result.timeEnoughApprovesRaw;
+      reviewTimeRaw += result.reviewTimeRaw;
+    });
+    resume.push({
+      author,
+      numnerOfPRs,
+      filesChangedAvg: filesChanged/numnerOfPRs,
+      changesAvg: changes/numnerOfPRs,
+      timeToMergeAvg: formatTime(timeToMergeRaw/numnerOfPRs),
+      timeToFirstReviewAvg: formatTime(timeToFirstReviewRaw/numnerOfPRs),
+      timeEnoughApprovesAvg: formatTime(timeEnoughApprovesRaw/numnerOfPRs),
+      reviewTimeAvg: formatTime(reviewTimeRaw/numnerOfPRs)
+    });
+  })
+  return resume;
+};
+
 async function main() {
   const getBranch = await inquirer.prompt({
     type: 'input',
@@ -212,14 +254,20 @@ async function main() {
         filesChanged: files.data.length,
         changes,
         firstReview: formatTime(timeToFirstReview),
+        timeToFirstReviewRaw: timeToFirstReview,
         getApproves: formatTime(timeEnoughApproves),
+        timeEnoughApprovesRaw: timeEnoughApproves,
         reviewTime: formatTime(reviewTime),
-        timeToMerge: formatTime(timeToMerge)
+        reviewTimeRaw: reviewTime,
+        timeToMerge: formatTime(timeToMerge),
+        timeToMergeRaw: timeToMerge,
+        author: pr.user.login
       };
     })
   );
 
   console.table(results);
+  console.table(getAvgResumeDataByAuthor(results));
   console.table([getAvgResumeData(resumeData, results.length)]);
 }
 
