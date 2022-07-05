@@ -26,7 +26,18 @@ REPO_NAME=repo-name
 
 You need a GitHub token with the right permission in your repository.
 
-**Note:** The application automatically reads _.env_ file in the execution path.
+**Note:** The application automatically reads _.env_ file in the execution path. Also, if you want to get metrics grouped by teams, you can add _groups.json_ file with the next structure:
+
+```
+{
+  "githubUser1": "teamA",
+  "githubUser2": "teamB",
+  "githubUser3": "teamB",
+  "githubUser4": "teamC",
+  "githubUser5": "teamA",
+}
+
+```
 
 ## Pull request metrics
 
@@ -36,7 +47,7 @@ You need a GitHub token with the right permission in your repository.
 
 **Time to review:** time between first review date and merged date
 
-**Time to merge:** time between opening date and merged date
+**Lead time:** time between opening date and merged date
 
 **Files changes:** number of files changes in the pull request
 

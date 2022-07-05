@@ -61,51 +61,98 @@ const getAvgResumeData = (data, countPrs) => {
     firstReviewAvg: formatTime(data.firstReview / countPrs),
     getApprovesAvg: formatTime(data.getApproves / countPrs),
     reviewTimeAvg: formatTime(data.reviewTime / countPrs),
-    timeToMergeAvg: formatTime(data.timeToMerge / countPrs),
-    filesChangedAvg: Math.floor(data.filesChanged / countPrs),
-    changesAvg: Math.floor(data.changes / countPrs)
+    leadTimeAvg: formatTime(data.leadTime / countPrs),
+    filesChangedAvg: (data.filesChanged / countPrs).toFixed(2),
+    changesAvg: (data.changes / countPrs).toFixed(2)
   };
 };
 
 const getAvgResumeDataByAuthor = (results) => {
-  const byAuthorResults = {}
+  const byAuthorResults = {};
   results.forEach((result) => {
-    const collection = byAuthorResults[result.author]
+    const collection = byAuthorResults[result.author];
     if (!collection) {
       byAuthorResults[result.author] = [result];
     } else {
       collection.push(result);
     }
   });
-  const resume = []
+  const resume = [];
   Object.keys(byAuthorResults).forEach((author) => {
     const results = byAuthorResults[author];
-    const numnerOfPRs = results.length;
+    const numberOfPRs = results.length;
     let filesChanged = 0;
     let changes = 0;
-    let timeToMergeRaw = 0;
+    let leadTimeRaw = 0;
     let timeToFirstReviewRaw = 0;
     let timeEnoughApprovesRaw = 0;
     let reviewTimeRaw = 0;
     results.forEach((result) => {
       filesChanged += result.filesChanged;
       changes += result.changes;
-      timeToMergeRaw += result.timeToMergeRaw;
+      leadTimeRaw += result.leadTimeRaw;
       timeToFirstReviewRaw += result.timeToFirstReviewRaw;
       timeEnoughApprovesRaw += result.timeEnoughApprovesRaw;
       reviewTimeRaw += result.reviewTimeRaw;
     });
     resume.push({
       author,
-      numnerOfPRs,
-      filesChangedAvg: filesChanged/numnerOfPRs,
-      changesAvg: changes/numnerOfPRs,
-      timeToMergeAvg: formatTime(timeToMergeRaw/numnerOfPRs),
-      timeToFirstReviewAvg: formatTime(timeToFirstReviewRaw/numnerOfPRs),
-      timeEnoughApprovesAvg: formatTime(timeEnoughApprovesRaw/numnerOfPRs),
-      reviewTimeAvg: formatTime(reviewTimeRaw/numnerOfPRs)
+      numberOfPRs,
+      filesChangedAvg: (filesChanged / numberOfPRs).toFixed(2),
+      changesAvg: (changes / numberOfPRs).toFixed(2),
+      leadTimeAvg: formatTime(leadTimeRaw / numberOfPRs),
+      timeToFirstReviewAvg: formatTime(timeToFirstReviewRaw / numberOfPRs),
+      timeEnoughApprovesAvg: formatTime(timeEnoughApprovesRaw / numberOfPRs),
+      reviewTimeAvg: formatTime(reviewTimeRaw / numberOfPRs)
     });
-  })
+  });
+  return resume;
+};
+
+const getAvgResumeDataByGroup = (results) => {
+  const groups = require('./groups.json');
+
+  const byGroupResults = {};
+  results.forEach((result) => {
+    const userGroup = groups[result.author]
+      ? groups[result.author]
+      : 'withoutGroup';
+    const collection = byGroupResults[userGroup];
+    if (!collection) {
+      byGroupResults[userGroup] = [result];
+    } else {
+      collection.push(result);
+    }
+  });
+  const resume = [];
+  Object.keys(byGroupResults).forEach((group) => {
+    const results = byGroupResults[group];
+    const numberOfPRs = results.length;
+    let filesChanged = 0;
+    let changes = 0;
+    let leadTimeRaw = 0;
+    let timeToFirstReviewRaw = 0;
+    let timeEnoughApprovesRaw = 0;
+    let reviewTimeRaw = 0;
+    results.forEach((result) => {
+      filesChanged += result.filesChanged;
+      changes += result.changes;
+      leadTimeRaw += result.leadTimeRaw;
+      timeToFirstReviewRaw += result.timeToFirstReviewRaw;
+      timeEnoughApprovesRaw += result.timeEnoughApprovesRaw;
+      reviewTimeRaw += result.reviewTimeRaw;
+    });
+    resume.push({
+      group,
+      numberOfPRs,
+      filesChangedAvg: (filesChanged / numberOfPRs).toFixed(2),
+      changesAvg: (changes / numberOfPRs).toFixed(2),
+      leadTimeAvg: formatTime(leadTimeRaw / numberOfPRs),
+      timeToFirstReviewAvg: formatTime(timeToFirstReviewRaw / numberOfPRs),
+      timeEnoughApprovesAvg: formatTime(timeEnoughApprovesRaw / numberOfPRs),
+      reviewTimeAvg: formatTime(reviewTimeRaw / numberOfPRs)
+    });
+  });
   return resume;
 };
 
@@ -159,7 +206,7 @@ async function main() {
     firstReview: 0,
     getApproves: 0,
     reviewTime: 0,
-    timeToMerge: 0,
+    leadTime: 0,
     filesChanged: 0,
     changes: 0
   };
@@ -220,7 +267,7 @@ async function main() {
           firstReview: 0,
           getApproves: 0,
           reviewTime: 0,
-          timeToMerge: 0,
+          leadTime: 0,
           filesChanged: files.data.length,
           changes
         };
@@ -237,13 +284,13 @@ async function main() {
       // Review time
       const reviewTime = timeDiff(closed, firstReview);
 
-      // Time to merge
-      const timeToMerge = timeDiff(closed, created);
+      // Lead time
+      const leadTime = timeDiff(closed, created);
 
       resumeData.firstReview += timeToFirstReview;
       resumeData.getApproves += timeEnoughApproves;
       resumeData.reviewTime += reviewTime;
-      resumeData.timeToMerge += timeToMerge;
+      resumeData.leadTime += leadTime;
       resumeData.filesChanged += files.data.length;
       resumeData.changes += changes;
 
@@ -259,8 +306,8 @@ async function main() {
         timeEnoughApprovesRaw: timeEnoughApproves,
         reviewTime: formatTime(reviewTime),
         reviewTimeRaw: reviewTime,
-        timeToMerge: formatTime(timeToMerge),
-        timeToMergeRaw: timeToMerge,
+        leadTime: formatTime(leadTime),
+        leadTimeRaw: leadTime,
         author: pr.user.login
       };
     })
@@ -268,6 +315,7 @@ async function main() {
 
   console.table(results);
   console.table(getAvgResumeDataByAuthor(results));
+  console.table(getAvgResumeDataByGroup(results));
   console.table([getAvgResumeData(resumeData, results.length)]);
 }
 
